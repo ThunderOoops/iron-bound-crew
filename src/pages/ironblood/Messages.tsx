@@ -91,17 +91,7 @@ export default function Messages() {
         <div className="mx-auto max-w-7xl px-4 md:px-6 py-8">
           <div className="text-[11px] font-mono uppercase tracking-[0.3em] text-blood">Inbox</div>
           <h1 className="mt-2 display-lg text-iron">YOUR <span className="text-blood">CIRCLE</span></h1>
-          <div className="mt-6 inline-flex border border-hair">
-            {[
-              { id: "messages",   label: "Messages" },
-              { id: "challenges", label: "Challenges" },
-            ].map(t => (
-              <button key={t.id} onClick={() => setTab(t.id as any)}
-                className={`px-5 h-11 text-xs font-bold uppercase tracking-widest ${
-                  tab === t.id ? "bg-blood text-white" : "bg-card text-bone hover:text-iron"
-                }`}>{t.label}</button>
-            ))}
-          </div>
+          <p className="mt-3 text-sm text-bone">Direct messages with athletes. Realtime. Encrypted in transit.</p>
         </div>
       </section>
 
