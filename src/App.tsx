@@ -18,6 +18,7 @@ import Onboarding from "./pages/ironblood/Onboarding";
 import Auth from "./pages/ironblood/Auth";
 import { TopNav } from "./components/layout/TopNav";
 import { MobileTabBar } from "./components/layout/MobileTabBar";
+import { AuthProvider } from "./hooks/useAuth";
 
 const queryClient = new QueryClient();
 
@@ -27,8 +28,9 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <TopNav />
-        <Routes>
+        <AuthProvider>
+          <TopNav />
+          <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/onboarding" element={<Onboarding />} />
@@ -43,9 +45,10 @@ const App = () => (
           <Route path="/leaderboard" element={<Leaderboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
-        </Routes>
-        <MobileTabBar />
-        <div className="md:hidden h-16" aria-hidden />
+          </Routes>
+          <MobileTabBar />
+          <div className="md:hidden h-16" aria-hidden />
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
