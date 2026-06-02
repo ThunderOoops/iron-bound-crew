@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { SPORTS, LEVELS, TIMES, DAYS } from "@/data/sports";
 import { ArrowLeft, ArrowRight, MapPin, Upload, Check } from "lucide-react";
 import { Logo } from "@/components/ironblood/Logo";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const STEPS = ["Identity", "Battlefield", "Schedule", "Location", "Intent"] as const;
 
@@ -22,21 +24,59 @@ function Tile({ active, children, onClick }: any) {
 
 export default function Onboarding() {
   const nav = useNavigate();
+  const { user, loading, refreshProfile } = useAuth();
   const [step, setStep] = useState(0);
+  const [saving, setSaving] = useState(false);
   const [data, setData] = useState<any>({
+    full_name: "",
+    age: "",
+    tagline: "",
+    city: "",
+    area: "",
     sports: [] as string[],
     days: [] as string[],
     intents: [] as string[],
     level: "",
     time: "",
     intensity: "",
+    frequency: "",
   });
+
+  useEffect(() => {
+    if (!loading && !user) nav("/auth", { replace: true });
+  }, [user, loading, nav]);
 
   const toggle = (k: string, v: string) => setData((d: any) => ({
     ...d, [k]: d[k].includes(v) ? d[k].filter((x: string) => x !== v) : [...d[k], v],
   }));
 
   const pct = ((step + 1) / STEPS.length) * 100;
+
+  const finish = async () => {
+    if (!user) return;
+    setSaving(true);
+    const { error } = await supabase.from("profiles").update({
+      full_name: data.full_name || null,
+      age: data.age ? parseInt(data.age) : null,
+      tagline: data.tagline || null,
+      city: data.city || null,
+      area: data.area || null,
+      sports: data.sports,
+      days: data.days,
+      intents: data.intents,
+      level: data.level || null,
+      time_pref: data.time || null,
+      intensity: data.intensity || null,
+      frequency: data.frequency || null,
+      username: (data.full_name || "athlete").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 20) + "-" + user.id.slice(0, 4),
+      onboarded: true,
+    }).eq("id", user.id);
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    await refreshProfile();
+    toast.success("Profile forged. Welcome to IRONBLOOD.");
+    nav("/dashboard?welcome=1");
+  };
 
   return (
     <main className="min-h-screen bg-deep grain">
@@ -57,8 +97,8 @@ export default function Onboarding() {
           <section className="space-y-6">
             <h1 className="display-lg text-iron">WHO ARE YOU, <span className="text-blood">ATHLETE?</span></h1>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Input placeholder="Full name" className="bg-card border-hair h-12 rounded-none" />
-              <Input placeholder="Age" type="number" className="bg-card border-hair h-12 rounded-none" />
+              <Input value={data.full_name} onChange={e => setData({ ...data, full_name: e.target.value })} placeholder="Full name" className="bg-card border-hair h-12 rounded-none" />
+              <Input value={data.age} onChange={e => setData({ ...data, age: e.target.value })} placeholder="Age" type="number" className="bg-card border-hair h-12 rounded-none" />
             </div>
             <label className="flex items-center gap-3 border border-dashed border-hair bg-card p-6 cursor-pointer hover:border-blood/60 transition-colors">
               <Upload className="h-5 w-5 text-blood" />
@@ -70,7 +110,7 @@ export default function Onboarding() {
             </label>
             <div>
               <div className="text-[11px] font-mono uppercase tracking-widest text-bone mb-2">Tagline</div>
-              <Input placeholder='e.g. "5AM lifter. 3-plate club. No rest days."'
+              <Input value={data.tagline} onChange={e => setData({ ...data, tagline: e.target.value })} placeholder='e.g. "5AM lifter. 3-plate club. No rest days."'
                 className="bg-card border-hair h-12 rounded-none" />
               <div className="mt-1 text-xs text-bone">One line. Who are you in the gym?</div>
             </div>
@@ -138,8 +178,10 @@ export default function Onboarding() {
               <div className="text-[11px] font-mono uppercase tracking-widest text-bone mb-3">Frequency</div>
               <div className="flex flex-wrap gap-2">
                 {["Daily","5–6x week","3–4x week","1–2x week"].map(f => (
-                  <button key={f} type="button"
-                    className="px-4 h-10 text-xs font-bold uppercase tracking-widest border bg-card text-bone border-hair hover:border-blood/60 hover:text-iron">
+                  <button key={f} type="button" onClick={() => setData({ ...data, frequency: f })}
+                    className={`px-4 h-10 text-xs font-bold uppercase tracking-widest border transition-all ${
+                      data.frequency === f ? "bg-blood text-white border-blood" : "bg-card text-bone border-hair hover:border-blood/60 hover:text-iron"
+                    }`}>
                     {f}
                   </button>
                 ))}
@@ -170,8 +212,8 @@ export default function Onboarding() {
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Input placeholder="City / area" className="bg-card border-hair h-12 rounded-none" />
-              <Input placeholder="Preferred venue (optional)" className="bg-card border-hair h-12 rounded-none" />
+              <Input value={data.city} onChange={e => setData({ ...data, city: e.target.value })} placeholder="City (e.g. Mumbai)" className="bg-card border-hair h-12 rounded-none" />
+              <Input value={data.area} onChange={e => setData({ ...data, area: e.target.value })} placeholder="Area / neighbourhood" className="bg-card border-hair h-12 rounded-none" />
             </div>
           </section>
         )}
@@ -218,8 +260,8 @@ export default function Onboarding() {
               Continue <ArrowRight className="h-4 w-4" />
             </Button>
           ) : (
-            <Button variant="blood" size="lg" onClick={() => nav("/dashboard?welcome=1")}>
-              <Check className="h-4 w-4" /> Enter the Circle
+            <Button variant="blood" size="lg" disabled={saving} onClick={finish}>
+              <Check className="h-4 w-4" /> {saving ? "Forging…" : "Enter the Circle"}
             </Button>
           )}
         </div>
