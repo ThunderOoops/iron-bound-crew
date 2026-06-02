@@ -1,21 +1,23 @@
 import { useMemo, useState } from "react";
-import { EVENTS } from "@/data/events";
 import { SPORTS } from "@/data/sports";
 import { EventCard } from "@/components/ironblood/EventCard";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { useEvents } from "@/hooks/useEvents";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Events() {
   const [tab, setTab] = useState<"competitions" | "sessions">("competitions");
   const [sport, setSport] = useState<string | null>(null);
   const [feeFilter, setFeeFilter] = useState<"any"|"free"|"paid">("any");
 
-  const list = useMemo(() => EVENTS.filter(e => {
+  const { data: events = [], isLoading } = useEvents();
+  const list = useMemo(() => events.filter(e => {
     const matchesTab = tab === "competitions" ? e.type !== "session" : e.type === "session";
     const matchesSport = !sport || e.sport === sport;
     const matchesFee = feeFilter === "any" || (feeFilter === "free" ? e.fee === 0 : e.fee > 0);
     return matchesTab && matchesSport && matchesFee;
-  }), [tab, sport, feeFilter]);
+  }), [events, tab, sport, feeFilter]);
 
   return (
     <main className="bg-deep min-h-screen">
@@ -64,7 +66,11 @@ export default function Events() {
       </div>
 
       <section className="mx-auto max-w-7xl px-4 md:px-6 py-8 md:py-12">
-        {list.length === 0 ? (
+        {isLoading ? (
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-80 rounded-none bg-card" />)}
+          </div>
+        ) : list.length === 0 ? (
           <div className="border border-hair bg-card p-12 text-center">
             <p className="font-display text-3xl text-iron">NO BATTLES YET.</p>
             <p className="mt-2 text-bone">"Build the arena and they'll come."</p>

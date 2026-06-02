@@ -1,15 +1,27 @@
 import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { eventBySlug } from "@/data/events";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { sportBySlug } from "@/data/sports";
-import { ATHLETES } from "@/data/athletes";
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Users, Trophy, ShieldCheck, Clock, Check } from "lucide-react";
+import { useEvent } from "@/hooks/useEvents";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function EventDetail() {
   const { slug } = useParams();
-  const event = slug ? eventBySlug(slug) : undefined;
+  const nav = useNavigate();
+  const qc = useQueryClient();
+  const { data: event, isLoading } = useEvent(slug);
+  const { user } = useAuth();
   const [paid, setPaid] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  if (isLoading) {
+    return <main className="min-h-screen bg-deep p-10"><Skeleton className="h-96 rounded-none bg-card" /></main>;
+  }
 
   if (!event) {
     return (
@@ -26,7 +38,32 @@ export default function EventDetail() {
   const isFree = event.fee === 0;
   const remaining = event.spots - event.registered;
   const fillPct = Math.round((event.registered / event.spots) * 100);
-  const registered = ATHLETES.slice(0, Math.min(6, event.registered));
+
+  const claim = async () => {
+    if (!user) { nav("/auth"); return; }
+    setBusy(true);
+    try {
+      const { error } = await supabase.from("event_registrations").insert({
+        event_id: event.id,
+        user_id: user.id,
+        status: isFree ? "registered" : "paid",
+        paid_amount: event.fee,
+      });
+      if (error) {
+        if (error.code === "23505") {
+          toast.info("You're already locked in for this event.");
+          setPaid(true);
+        } else throw error;
+      } else {
+        setPaid(true);
+        toast.success(isFree ? "You're in. Show up. Compete." : "Spot locked. Payment confirmed.");
+        qc.invalidateQueries({ queryKey: ["events"] });
+        qc.invalidateQueries({ queryKey: ["event", slug] });
+      }
+    } catch (err: any) {
+      toast.error(err.message ?? "Could not register");
+    } finally { setBusy(false); }
+  };
 
   return (
     <main className="bg-deep min-h-screen pb-16">
@@ -86,16 +123,10 @@ export default function EventDetail() {
 
           <div>
             <h2 className="font-display text-2xl text-iron">REGISTERED ATHLETES</h2>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              {registered.map(a => (
-                <Link key={a.id} to={`/athlete/${a.username}`} className="flex items-center gap-2 border border-hair bg-card pr-3 hover:border-blood/60 transition-colors">
-                  <img src={a.photo} alt="" className="h-9 w-9 object-cover" />
-                  <span className="text-xs text-iron">{a.name}</span>
-                </Link>
-              ))}
-              {event.registered > registered.length && (
-                <span className="text-xs font-mono uppercase tracking-widest text-bone">+ {event.registered - registered.length} others</span>
-              )}
+            <div className="mt-4 text-xs font-mono uppercase tracking-widest text-bone">
+              {event.registered === 0
+                ? "Be the first to lock in."
+                : `${event.registered} athlete${event.registered === 1 ? "" : "s"} locked in.`}
             </div>
           </div>
 
@@ -141,8 +172,8 @@ export default function EventDetail() {
                 </div>
               </div>
 
-              <Button variant="blood" size="lg" className="mt-6 w-full" onClick={() => setPaid(true)}>
-                {isFree ? "Join Session" : "Register & Pay"}
+              <Button variant="blood" size="lg" disabled={busy} className="mt-6 w-full" onClick={claim}>
+                {busy ? "…" : !user ? "Sign In to Claim" : isFree ? "Join Session" : "Register & Pay"}
               </Button>
               <p className="mt-3 text-[10px] font-mono uppercase tracking-widest text-bone text-center">
                 {isFree ? "No payment required" : "Secured by mock checkout · Refunds per host policy"}
