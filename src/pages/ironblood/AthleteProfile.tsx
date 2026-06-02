@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { athleteByUsername } from "@/data/athletes";
 import { Button } from "@/components/ui/button";
@@ -5,6 +6,7 @@ import { LevelBadge } from "@/components/ironblood/LevelBadge";
 import { SportPill } from "@/components/ironblood/SportPill";
 import { DAYS } from "@/data/sports";
 import { MapPin, Flame, Trophy, ShieldCheck, Crown } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const ACHIEVEMENTS = [
   { id: "first",    icon: "🏆", title: "First Blood",     desc: "First event registered" },
@@ -16,7 +18,32 @@ const ACHIEVEMENTS = [
 
 export default function AthleteProfile() {
   const { username } = useParams();
-  const a = username ? athleteByUsername(username) : undefined;
+  const mock = username ? athleteByUsername(username) : undefined;
+  const [a, setA] = useState<any>(mock);
+
+  useEffect(() => {
+    if (mock || !username) return;
+    supabase.from("profiles").select("*").eq("username", username).maybeSingle().then(({ data }) => {
+      if (!data) return;
+      setA({
+        id: data.id,
+        username: data.username,
+        name: data.full_name ?? "Athlete",
+        age: data.age ?? 0,
+        city: data.city ?? "",
+        area: data.area ?? "",
+        photo: data.photo_url ?? "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=600&q=70",
+        sports: data.sports ?? [],
+        level: data.level ?? "intermediate",
+        tagline: data.tagline ?? "",
+        bio: data.bio ?? "",
+        days: data.days ?? [],
+        time: data.time_pref ?? "flex",
+        verified: data.is_verified, topHost: false,
+        streak: data.streak ?? 0, challenges: 0, attended: 0, hosted: 0,
+      });
+    });
+  }, [username, mock]);
 
   if (!a) {
     return (
@@ -62,8 +89,9 @@ export default function AthleteProfile() {
                 </div>
               ))}
             </div>
-            <div className="pt-2 hidden md:block">
-              <Button variant="blood" size="lg">Send Challenge</Button>
+            <div className="pt-2 hidden md:flex gap-2">
+              <Button asChild variant="blood" size="lg"><Link to={`/messages?to=${a.id}`}>Send Challenge</Link></Button>
+              <Button asChild variant="outline" size="lg"><Link to={`/messages?to=${a.id}`}>Message</Link></Button>
             </div>
           </div>
         </div>
@@ -107,7 +135,7 @@ export default function AthleteProfile() {
 
       {/* Mobile sticky CTA */}
       <div className="md:hidden fixed bottom-16 inset-x-0 z-30 p-3 bg-deep/95 border-t border-hair">
-        <Button variant="blood" size="lg" className="w-full">Send Challenge</Button>
+        <Button asChild variant="blood" size="lg" className="w-full"><Link to={`/messages?to=${a.id}`}>Send Challenge</Link></Button>
       </div>
     </main>
   );
