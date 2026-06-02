@@ -1,10 +1,28 @@
-import { EVENTS } from "@/data/events";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Users, IndianRupee, MessageSquare, X } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { dbToIbEvent } from "@/hooks/useEvents";
 
 export default function HostDashboard() {
-  const myEvents = EVENTS.slice(0, 3);
+  const nav = useNavigate();
+  const { user, loading } = useAuth();
+  const [myEvents, setMyEvents] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!loading && !user) { nav("/auth", { replace: true }); return; }
+    if (!user) return;
+    (async () => {
+      const { data: evs } = await supabase.from("events").select("*").eq("host_id", user.id).order("date", { ascending: false });
+      if (!evs) return;
+      const { data: counts } = await supabase.from("event_counts").select("*");
+      const map = new Map<string, number>((counts ?? []).map((c: any) => [c.event_id, c.registered_count]));
+      setMyEvents(evs.map((e: any) => dbToIbEvent(e, map.get(e.id) ?? 0)));
+    })();
+  }, [user, loading, nav]);
+
   const totalRevenue = myEvents.reduce((acc, e) => acc + e.fee * e.registered, 0);
   const platformFee = totalRevenue * 0.1;
   const earnings = totalRevenue - platformFee;
@@ -36,7 +54,13 @@ export default function HostDashboard() {
           <Button asChild variant="blood"><Link to="/host">+ Create Event</Link></Button>
         </div>
 
-        {myEvents.map(e => {
+        {myEvents.length === 0 ? (
+          <div className="border border-hair bg-card p-12 text-center">
+            <p className="font-display text-3xl text-iron">NO ARENAS YET.</p>
+            <p className="mt-2 text-bone">"Build it. The athletes will come."</p>
+            <Button asChild variant="blood" className="mt-6"><Link to="/host">Host your first event</Link></Button>
+          </div>
+        ) : myEvents.map(e => {
           const pct = Math.round((e.registered/e.spots)*100);
           return (
             <div key={e.id} className="border border-hair bg-card p-5 grid gap-4 md:grid-cols-[1fr_auto] glow-red-hover">
