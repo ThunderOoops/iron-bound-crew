@@ -1,6 +1,7 @@
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { Logo } from "@/components/ironblood/Logo";
-import { Bell, MessageSquare, User } from "lucide-react";
+import { Bell, MessageSquare, User, LogOut, LogIn } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 const links = [
   { to: "/discover", label: "Discover" },
@@ -11,6 +12,7 @@ const links = [
 
 export function TopNav() {
   const { pathname } = useLocation();
+  const { user, signOut } = useAuth();
   if (pathname === "/onboarding" || pathname.startsWith("/auth")) return null;
   return (
     <header className="sticky top-0 z-40 border-b border-hair bg-deep/85 backdrop-blur supports-[backdrop-filter]:bg-deep/70">
@@ -39,6 +41,15 @@ export function TopNav() {
           <Link to="/dashboard" className="inline-flex h-10 items-center gap-2 border border-hair bg-elev px-3 text-xs font-mono uppercase tracking-widest text-iron hover:border-blood/60 hover:text-blood transition-colors">
             <User className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Dashboard</span>
           </Link>
+          {user ? (
+            <button onClick={signOut} title="Sign out" className="hidden md:inline-flex h-10 w-10 items-center justify-center text-bone hover:text-blood transition-colors">
+              <LogOut className="h-4 w-4" />
+            </button>
+          ) : (
+            <Link to="/auth" title="Sign in" className="hidden md:inline-flex h-10 items-center gap-2 border border-blood bg-blood px-3 text-xs font-mono uppercase tracking-widest text-white hover:bg-blood/90 transition-colors">
+              <LogIn className="h-3.5 w-3.5" /> Sign In
+            </Link>
+          )}
         </div>
       </div>
     </header>

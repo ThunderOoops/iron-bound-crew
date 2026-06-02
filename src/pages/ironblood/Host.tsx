@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SPORTS } from "@/data/sports";
 import { ArrowLeft, ArrowRight, Check, Swords, Users, Trophy, ListChecks } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const STEPS = ["Type","Details","Date & Place","Pricing","Review"] as const;
 
@@ -16,9 +19,58 @@ const TYPES = [
 ];
 
 export default function Host() {
+  const nav = useNavigate();
+  const { user, profile, loading } = useAuth();
   const [step, setStep] = useState(0);
-  const [data, setData] = useState<any>({ type: "competition", paid: true, fee: 500 });
+  const [data, setData] = useState<any>({
+    type: "competition", paid: true, fee: 500, prizePool: 0,
+    name: "", sport: "", short: "", description: "", format: "",
+    date: "", time: "", venue: "", address: "", spots: 30,
+  });
   const [published, setPublished] = useState(false);
+  const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!loading && !user) nav("/auth", { replace: true });
+  }, [user, loading, nav]);
+
+  const publish = async () => {
+    if (!user) return;
+    if (!data.name || !data.sport || !data.date) {
+      toast.error("Name, sport, and date are required.");
+      return;
+    }
+    setBusy(true);
+    const slug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) + "-" + Date.now().toString(36);
+    const dateIso = new Date(`${data.date}T${data.time || "10:00"}`).toISOString();
+    const { error } = await supabase.from("events").insert({
+      slug,
+      host_id: user.id,
+      host_name: profile?.full_name ?? "Host",
+      host_verified: profile?.is_verified ?? false,
+      name: data.name,
+      type: data.type,
+      sport: data.sport,
+      date: dateIso,
+      city: data.venue.split(",").pop()?.trim() || "—",
+      venue: data.venue || "TBD",
+      address: data.address || data.venue || "TBD",
+      fee: data.paid ? Number(data.fee) || 0 : 0,
+      prize_pool: data.paid && data.prizePool ? Number(data.prizePool) : null,
+      spots: Number(data.spots) || 30,
+      format: data.format || null,
+      description: data.description || null,
+      rules: data.short || null,
+      schedule: [],
+      banner_url: "https://images.unsplash.com/photo-1517963879433-6ad2b056d712?auto=format&fit=crop&w=1400&q=70",
+    });
+    setBusy(false);
+    if (error) { toast.error(error.message); return; }
+    setPublishedSlug(slug);
+    setPublished(true);
+    toast.success("Your arena is live.");
+  };
 
   if (published) {
     return (
@@ -30,12 +82,12 @@ export default function Host() {
           <h1 className="display-lg text-iron">YOUR ARENA <span className="text-blood">IS OPEN.</span></h1>
           <p className="mt-3 text-bone">Share the link. Fill the spots. Run the day.</p>
           <div className="mt-6 flex items-center gap-2 border border-hair bg-card px-3 py-3">
-            <code className="flex-1 text-xs font-mono text-iron truncate">ironblood.app/events/your-new-event</code>
-            <Button size="sm" variant="bloodOutline">Copy</Button>
+            <code className="flex-1 text-xs font-mono text-iron truncate">{window.location.origin}/events/{publishedSlug}</code>
+            <Button size="sm" variant="bloodOutline" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/events/${publishedSlug}`)}>Copy</Button>
           </div>
           <div className="mt-6 flex gap-3 justify-center">
             <Button asChild variant="blood"><Link to="/dashboard/host">Open Host Dashboard</Link></Button>
-            <Button asChild variant="outline"><Link to="/events">Browse Events</Link></Button>
+            <Button asChild variant="outline"><Link to={`/events/${publishedSlug}`}>View Event</Link></Button>
           </div>
         </div>
       </main>
@@ -94,14 +146,14 @@ export default function Host() {
         {step === 1 && (
           <div className="space-y-5">
             <h2 className="display-md text-iron">EVENT <span className="text-blood">DETAILS</span></h2>
-            <Input placeholder="Event name (e.g. Mumbai Iron Cup)" className="bg-card border-hair h-12 rounded-none" />
-            <select className="w-full h-12 rounded-none border border-hair bg-card px-3 text-sm text-iron focus:border-blood outline-none">
-              <option>Select sport</option>
-              {SPORTS.map(s => <option key={s.slug}>{s.emoji} {s.name}</option>)}
+            <Input value={data.name} onChange={e => setData({ ...data, name: e.target.value })} placeholder="Event name (e.g. Mumbai Iron Cup)" className="bg-card border-hair h-12 rounded-none" />
+            <select value={data.sport} onChange={e => setData({ ...data, sport: e.target.value })} className="w-full h-12 rounded-none border border-hair bg-card px-3 text-sm text-iron focus:border-blood outline-none">
+              <option value="">Select sport</option>
+              {SPORTS.map(s => <option key={s.slug} value={s.slug}>{s.emoji} {s.name}</option>)}
             </select>
-            <Input placeholder="Short description (max 250 chars)" className="bg-card border-hair h-12 rounded-none" />
-            <Textarea placeholder="Full description, rules, what to bring..." className="bg-card border-hair rounded-none min-h-32" />
-            <Input placeholder="Format (1v1 · Team · Open)" className="bg-card border-hair h-12 rounded-none" />
+            <Input value={data.short} onChange={e => setData({ ...data, short: e.target.value })} placeholder="Rules / one-line summary" className="bg-card border-hair h-12 rounded-none" />
+            <Textarea value={data.description} onChange={e => setData({ ...data, description: e.target.value })} placeholder="Full description, what to bring..." className="bg-card border-hair rounded-none min-h-32" />
+            <Input value={data.format} onChange={e => setData({ ...data, format: e.target.value })} placeholder="Format (1v1 · Team · Open)" className="bg-card border-hair h-12 rounded-none" />
           </div>
         )}
 
@@ -109,12 +161,12 @@ export default function Host() {
           <div className="space-y-5">
             <h2 className="display-md text-iron">DATE & <span className="text-blood">PLACE</span></h2>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Input type="date" className="bg-card border-hair h-12 rounded-none" />
-              <Input type="time" className="bg-card border-hair h-12 rounded-none" />
+              <Input value={data.date} onChange={e => setData({ ...data, date: e.target.value })} type="date" className="bg-card border-hair h-12 rounded-none" />
+              <Input value={data.time} onChange={e => setData({ ...data, time: e.target.value })} type="time" className="bg-card border-hair h-12 rounded-none" />
             </div>
-            <Input placeholder="Venue name" className="bg-card border-hair h-12 rounded-none" />
-            <Input placeholder="Full address" className="bg-card border-hair h-12 rounded-none" />
-            <Input type="number" min={2} max={500} placeholder="Max participants (2–500)" className="bg-card border-hair h-12 rounded-none" />
+            <Input value={data.venue} onChange={e => setData({ ...data, venue: e.target.value })} placeholder="Venue name + city" className="bg-card border-hair h-12 rounded-none" />
+            <Input value={data.address} onChange={e => setData({ ...data, address: e.target.value })} placeholder="Full address" className="bg-card border-hair h-12 rounded-none" />
+            <Input value={data.spots} onChange={e => setData({ ...data, spots: e.target.value })} type="number" min={2} max={500} placeholder="Max participants (2–500)" className="bg-card border-hair h-12 rounded-none" />
           </div>
         )}
 
@@ -141,7 +193,7 @@ export default function Host() {
                   </div>
                   <div>
                     <label className="text-[11px] font-mono uppercase tracking-widest text-bone">Prize pool (₹) — optional</label>
-                    <Input type="number" placeholder="0" className="mt-2 bg-card border-hair h-12 rounded-none" />
+                    <Input type="number" placeholder="0" value={data.prizePool} onChange={e => setData({ ...data, prizePool: +e.target.value })} className="mt-2 bg-card border-hair h-12 rounded-none" />
                   </div>
                 </div>
                 <div>
@@ -184,8 +236,8 @@ export default function Host() {
               Continue <ArrowRight className="h-4 w-4" />
             </Button>
           ) : (
-            <Button variant="blood" size="lg" onClick={() => setPublished(true)}>
-              Publish Event
+            <Button variant="blood" size="lg" disabled={busy} onClick={publish}>
+              {busy ? "Publishing…" : "Publish Event"}
             </Button>
           )}
         </div>

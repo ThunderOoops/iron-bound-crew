@@ -5,11 +5,15 @@ import { SportsMarquee } from "@/components/ironblood/SportsMarquee";
 import { CountUp } from "@/components/ironblood/CountUp";
 import { SectionHeading } from "@/components/ironblood/SectionHeading";
 import { EventCard } from "@/components/ironblood/EventCard";
-import { EVENTS } from "@/data/events";
 import { ArrowRight, MapPin, Swords, Users, Trophy, Flame, Quote } from "lucide-react";
+import { useEvents } from "@/hooks/useEvents";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Landing() {
-  const featured = EVENTS.slice(0, 3);
+  const { data: events = [] } = useEvents();
+  const { user } = useAuth();
+  const featured = events.slice(0, 3);
+  const ctaHref = user ? "/dashboard" : "/auth";
 
   return (
     <main className="bg-deep">
@@ -63,10 +67,10 @@ export default function Landing() {
             transition={{ duration: 0.4, delay: 0.2 }}
             className="mt-8 flex flex-col sm:flex-row gap-3">
             <Button asChild variant="blood" size="lg" className="group">
-              <Link to="/discover">Find a Training Partner <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" /></Link>
+              <Link to={ctaHref}>{user ? "Open Dashboard" : "Join the Arena"} <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" /></Link>
             </Button>
             <Button asChild variant="outline" size="lg">
-              <Link to="/host">Host a Competition</Link>
+              <Link to="/discover">Find a Training Partner</Link>
             </Button>
           </motion.div>
 
@@ -222,7 +226,7 @@ export default function Landing() {
             <h3 className="mt-3 display-md text-iron">YOU. TRAINING. NOW.</h3>
           </div>
           <Button asChild variant="blood" size="xl">
-            <Link to="/onboarding">Enter the Arena</Link>
+            <Link to={ctaHref}>{user ? "Open Dashboard" : "Enter the Arena"}</Link>
           </Button>
         </div>
       </section>

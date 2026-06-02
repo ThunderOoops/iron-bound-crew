@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ATHLETES } from "@/data/athletes";
 import { SPORTS, LEVELS } from "@/data/sports";
@@ -6,6 +6,8 @@ import { AthleteCard } from "@/components/ironblood/AthleteCard";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Filter, RotateCcw } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import type { Athlete } from "@/data/athletes";
 
 export default function Discover() {
   const [params] = useSearchParams();
@@ -14,13 +16,46 @@ export default function Discover() {
   const [level, setLevel] = useState<string | null>(null);
   const [maxKm, setMaxKm] = useState(50);
   const [scheduleMatch, setScheduleMatch] = useState(false);
+  const [realAthletes, setRealAthletes] = useState<Athlete[]>([]);
 
-  const filtered = useMemo(() => ATHLETES.filter(a =>
+  useEffect(() => {
+    supabase.from("profiles").select("*").eq("onboarded", true).eq("is_hidden", false).limit(50).then(({ data }) => {
+      if (!data) return;
+      setRealAthletes(data.map((p: any) => ({
+        id: p.id,
+        username: p.username ?? p.id.slice(0, 8),
+        name: p.full_name ?? "Athlete",
+        age: p.age ?? 0,
+        city: p.city ?? "",
+        area: p.area ?? "",
+        distanceKm: 0,
+        photo: p.photo_url ?? "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=600&q=70",
+        sports: p.sports ?? [],
+        level: (p.level ?? "intermediate") as any,
+        intensity: (p.intensity ?? "moderate") as any,
+        tagline: p.tagline ?? "",
+        bio: p.bio ?? "",
+        days: p.days ?? [],
+        time: p.time_pref ?? "flex",
+        frequency: "—",
+        match: 80,
+        activeToday: true,
+        verified: p.is_verified,
+        topHost: false,
+        streak: p.streak ?? 0,
+        challenges: 0, attended: 0, hosted: 0,
+      })));
+    });
+  }, []);
+
+  const pool = realAthletes.length >= 4 ? realAthletes : [...realAthletes, ...ATHLETES];
+
+  const filtered = useMemo(() => pool.filter(a =>
     (!sport || a.sports.includes(sport)) &&
     (!level || a.level === level) &&
     a.distanceKm <= maxKm &&
     (!scheduleMatch || a.activeToday)
-  ), [sport, level, maxKm, scheduleMatch]);
+  ), [pool, sport, level, maxKm, scheduleMatch]);
 
   const reset = () => { setSport(null); setLevel(null); setMaxKm(50); setScheduleMatch(false); };
 
